@@ -89,6 +89,100 @@ controller.hears('hello', 'direct_message', function (bot, message) {
     bot.reply(message, 'Hello!');
 });
 
+controller.hears(
+  ['report', 'create', 'bug'], 
+  ['direct_mention', 'mention', 'direct_message'], 
+  function (bot, message) {
+    bot.reply(message, 'Seems like you would like to report a bug!')
+    bot.reply
+  }
+);
+
+controller.hears(
+  'interactive', 
+  'direct_message',
+  function(bot, message) {
+    bot.reply(message, {
+      attachments: [
+        {
+          title: "Do you want to play with me ?",
+          callback_id: '123',
+          attachment_type: 'default',
+          actions: [
+            {
+              "name": "yes",
+              "text": "YES",
+              "value": "yes",
+              "type": "button",
+            },
+            {
+              "name": "no",
+              "text": "NO",
+              "value": "no",
+              "type": "button",
+            }
+          ]
+        }
+      ]
+    });
+  }
+);
+
+// receive an interactive message, and reply with a message that will replace the original
+controller.on('interactive_message_callback', function(bot, message) {
+
+    // check message.actions and message.callback_id to see what action to take...
+
+    bot.replyInteractive(message, {
+        text: '...',
+        attachments: [
+            {
+                title: 'My buttons',
+                callback_id: '123',
+                attachment_type: 'default',
+                actions: [
+                    {
+                        "name":"yes",
+                        "text": "Yes!",
+                        "value": "yes",
+                        "type": "button",
+                    },
+                    {
+                       "text": "No!",
+                        "name": "no",
+                        "value": "delete",
+                        "style": "danger",
+                        "type": "button",
+                        "confirm": {
+                          "title": "Are you sure?",
+                          "text": "This will do something!",
+                          "ok_text": "Yes",
+                          "dismiss_text": "No"
+                        }
+                    }
+                ]
+            }
+        ]
+    });
+
+});
+
+// Fallback state
+controller.on(
+  ['direct_message', 'mention', 'direct_mention'],
+  function (bot, message) {
+    bot.api.reactions.add({
+      timestamp: message.ts,
+      channel: message.channel,
+      name: 'robot_face'
+    }, function (err)  {
+      if (err) {
+        console.log(err)
+      }
+      bot.reply(message, 'Didn\'t quite understand that');
+    });
+  }
+);
 
 /**
  * AN example of what could be:
