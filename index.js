@@ -41,12 +41,12 @@ if (process.env.MONGOLAB_URI) {
 /**
  * Are being run as an app or a custom integration? The initialization will differ, depending
  */
-
 if (process.env.TOKEN || process.env.SLACK_TOKEN) {
     //Treat this as a custom integration
     var customIntegration = require('./lib/custom_integrations');
     var token = (process.env.TOKEN) ? process.env.TOKEN : process.env.SLACK_TOKEN;
     var controller = customIntegration.configure(token, config, onInstallation);
+    console.log(process.env.PORT);
 } else if (process.env.CLIENT_ID && process.env.CLIENT_SECRET && process.env.PORT) {
     //Treat this as an app
     var app = require('./lib/apps');
@@ -75,97 +75,158 @@ controller.on('rtm_close', function (bot) {
     // you may want to attempt to re-open
 });
 
-
 /**
  * Core bot logic goes here!
  */
 // BEGIN EDITING HERE!
 
-controller.on('bot_channel_join', function (bot, message) {
-    bot.reply(message, "I'm here!")
-});
-
-controller.hears('hello', 'direct_message', function (bot, message) {
-    bot.reply(message, 'Hello!');
-});
-
-controller.hears(
-  ['report', 'create', 'bug'], 
-  ['direct_mention', 'mention', 'direct_message'], 
+controller.on(
+  'bot_channel_join', 
   function (bot, message) {
-    bot.reply(message, 'Seems like you would like to report a bug!')
-    bot.reply
+    bot.reply(message, "I'm here!")
   }
 );
 
 controller.hears(
-  'interactive', 
-  'direct_message',
+  'hello',
+  'direct_message', 
+  function (bot, message) {
+    bot.reply(message, 'Hello!');
+  }
+);
+
+//controller.hears(
+  //['report', 'create', 'bug'], 
+  //['direct_mention', 'mention', 'direct_message'], 
+  //function (bot, message) {
+    //bot.reply(message, 'Seems like you would like to report a bug!')
+    //bot.reply
+  //}
+//);
+
+controller.hears(
+	['dialog'],
+  ['direct_message'],
   function(bot, message) {
-    bot.reply(message, {
+    console.log("dialoegchen!")
+    var dialog = bot.createDialog(
+         'Title of dialog',
+         'callback_id',
+         'Submit'
+       ).addText('Text','text','some text')
+        .addSelect('Select','select',null,[{label:'Foo',value:'foo'},{label:'Bar',value:'bar'}],{placeholder: 'Select One'})
+        .addTextarea('Textarea','textarea','some longer text',{placeholder: 'Put words here'})
+        .addUrl('Website','url','http://botkit.ai');
+		bot.replyWithDialog(message, dialog.asObject());
+  }
+);
+
+var bug_report_id = "bug_report";
+var submit_report_id = "submit_report";
+
+// Entry point for bug reporting
+controller.hears(
+  ['bug', 'error', 'problem', 'failure', 'fehler', 'report'], 
+  ['direct_message', 'direct_mention'], 
+  function(bot, message) {
+    var buttons = {
       attachments: [
         {
-          title: "Do you want to play with me ?",
-          callback_id: '123',
+          title: 'Would you like to report a problem?',
+          callback_id: bug_report_id,
+          color: "#E88114",
           attachment_type: 'default',
           actions: [
             {
               "name": "yes",
-              "text": "YES",
+              "text": "Yes",
               "value": "yes",
               "type": "button",
+              "style": "primary"
             },
             {
-              "name": "no",
-              "text": "NO",
-              "value": "no",
+              "name":"nope",
+              "text": "Nop.",
+              "value": "nop",
               "type": "button",
             }
           ]
         }
       ]
-    });
+    };
+    bot.reply(message, buttons);
+});
+
+// receive an interactive message, and reply with a message that will replace the original
+controller.on(
+  'interactive_message_callback', 
+  function(bot, message) {
+    // check message.actions and message.callback_id to see what action to take...
+    console.log(message.callback_id);
+    if (message.callback_id == bug_report_id) {
+      // Remove message if 'no' was chosen
+      if (message.actions[0].value == "nop") {
+        bot.replyInteractive(message, {
+          text: 'Must have resolved itself... or a refresh did the trick.' 
+        })
+      } else {
+        console.log("Starting a new bug report");
+        var dialog = create_bug_dialog();
+        bot.replyInteractive(message, {
+          text: 'Problem is being filed.' 
+        })
+        bot.replyWithDialog(message, dialog.asObject());
+      }
+    } 
   }
 );
 
-// receive an interactive message, and reply with a message that will replace the original
-controller.on('interactive_message_callback', function(bot, message) {
 
-    // check message.actions and message.callback_id to see what action to take...
+controller.on('dialog_submission', function(bot, message) {
+	var submission = message.submission;
+	bot.reply(message, 'Thanks for you help, the problem was filed and our developer-penguins will be notified!');
+  console.log(submission);
 
-    bot.replyInteractive(message, {
-        text: '...',
-        attachments: [
-            {
-                title: 'My buttons',
-                callback_id: '123',
-                attachment_type: 'default',
-                actions: [
-                    {
-                        "name":"yes",
-                        "text": "Yes!",
-                        "value": "yes",
-                        "type": "button",
-                    },
-                    {
-                       "text": "No!",
-                        "name": "no",
-                        "value": "delete",
-                        "style": "danger",
-                        "type": "button",
-                        "confirm": {
-                          "title": "Are you sure?",
-                          "text": "This will do something!",
-                          "ok_text": "Yes",
-                          "dismiss_text": "No"
-                        }
-                    }
-                ]
-            }
-        ]
-    });
-
+	// call dialogOk or else Slack will think this is an error
+	bot.dialogOk();
 });
+
+function create_bug_dialog() {
+  var dialog = bot.createDialog(
+    'Bug Report',
+    'submit_report',
+    'Submit'
+  )
+    .addText('Title','title','', {placeholder: 'short description'})
+    .addSelect('Select severity', 'severity', null, [
+        {label: 'Annoying', value: 'bug'},
+        {label: 'Survivable but sweat-inducing', value: 'crit1'},
+        {label: 'It\'s bad, dude', value: 'crit2'},
+        {label: 'OMG I\'m freaking out', value: 'crit3'}
+      ],
+      {placeholder: 'Select One'}
+    )
+    .addSelect('Select environment', 'environment', null, [
+        {label:'Desktop',value:'desktop'},
+        {label:'Academic Cloud',value:'academic_cloud'},
+        {label:'Customer Cloud',value:'customer_cloud'},
+        {label: 'Staging', value: 'staging' },
+        {label: 'Developlment', value: 'master' }
+      ],
+      {placeholder: 'Select One'}
+    )
+    .addTextarea('Problem Description','problem', '', {
+      placeholder: 'What happened?',
+      max_length: 1000
+    })
+    .addTextarea('Steps to reproduce','reproduce', '', {
+      placeholder: 'How Did you get here?',
+      max_length: 1000
+    })
+  return dialog;
+}
+
+
 
 // Fallback state
 controller.on(
@@ -183,20 +244,3 @@ controller.on(
     });
   }
 );
-
-/**
- * AN example of what could be:
- * Any un-handled direct mention gets a reaction and a pat response!
- */
-//controller.on('direct_message,mention,direct_mention', function (bot, message) {
-//    bot.api.reactions.add({
-//        timestamp: message.ts,
-//        channel: message.channel,
-//        name: 'robot_face',
-//    }, function (err) {
-//        if (err) {
-//            console.log(err)
-//        }
-//        bot.reply(message, 'I heard you loud and clear boss.');
-//    });
-//});
