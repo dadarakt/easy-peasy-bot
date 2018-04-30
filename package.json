@@ -18,9 +18,9 @@
   "author": "Jannis Eichborn",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/DEGoodmanWilson/easy-peasy-bot-app/issues"
+    "url": "https://github.com/dadarakt/easy-peasy-bot"
   },
-  "homepage": "https://github.com/DEGoodmanWilson/easy-peasy-bot-app#readme",
+  "homepage": "https://github.com/dadarakt/easy-peasy-bot",
   "engines": {
     "node": "5.1.1"
   },

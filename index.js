@@ -161,11 +161,12 @@ controller.on('dialog_submission', function(bot, message) {
   // call dialogOk or else Slack will think this is an error
   bot.dialogOk();
 
-  submit_bug_report(submission);
+  submit_bug_report(submission, message);
 });
 
 
-function submit_bug_report(submission) {
+function submit_bug_report(submission, message) {
+  console.log(message);
   // Builds the markup'ed description
   var description ='%0A%0A' + '%23%23 Environment' + '%0A%0A'+ encodeURI(submission.environment) + '%0A%0A' + '%23%23 Problem Description'+ '%0A%0A' + encodeURI(submission.problem)  + '%0A%0A' + '%23%23 Steps to reproduce' + '%0A%0A' + encodeURI(submission.reproduce);
 
