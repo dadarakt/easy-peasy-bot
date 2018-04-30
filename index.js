@@ -1,7 +1,7 @@
 /**
  * A Bot for Slack!
  */
-
+var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 /**
  * Define a function for initiating a conversation on installation
@@ -95,32 +95,6 @@ controller.hears(
   }
 );
 
-//controller.hears(
-  //['report', 'create', 'bug'], 
-  //['direct_mention', 'mention', 'direct_message'], 
-  //function (bot, message) {
-    //bot.reply(message, 'Seems like you would like to report a bug!')
-    //bot.reply
-  //}
-//);
-
-controller.hears(
-	['dialog'],
-  ['direct_message'],
-  function(bot, message) {
-    console.log("dialoegchen!")
-    var dialog = bot.createDialog(
-         'Title of dialog',
-         'callback_id',
-         'Submit'
-       ).addText('Text','text','some text')
-        .addSelect('Select','select',null,[{label:'Foo',value:'foo'},{label:'Bar',value:'bar'}],{placeholder: 'Select One'})
-        .addTextarea('Textarea','textarea','some longer text',{placeholder: 'Put words here'})
-        .addUrl('Website','url','http://botkit.ai');
-		bot.replyWithDialog(message, dialog.asObject());
-  }
-);
-
 var bug_report_id = "bug_report";
 var submit_report_id = "submit_report";
 
@@ -129,6 +103,7 @@ controller.hears(
   ['bug', 'error', 'problem', 'failure', 'fehler', 'report'], 
   ['direct_message', 'direct_mention'], 
   function(bot, message) {
+		console.log('Someone is calling for help');
     var buttons = {
       attachments: [
         {
@@ -154,50 +129,92 @@ controller.hears(
         }
       ]
     };
+	  console.log('buttons are constructed');
     bot.reply(message, buttons);
 });
 
 // receive an interactive message, and reply with a message that will replace the original
-controller.on(
-  'interactive_message_callback', 
-  function(bot, message) {
-    // check message.actions and message.callback_id to see what action to take...
-    console.log(message.callback_id);
-    if (message.callback_id == bug_report_id) {
-      // Remove message if 'no' was chosen
-      if (message.actions[0].value == "nop") {
-        bot.replyInteractive(message, {
-          text: 'Must have resolved itself... or a refresh did the trick.' 
-        })
-      } else {
-        console.log("Starting a new bug report");
-        var dialog = create_bug_dialog();
-        bot.replyInteractive(message, {
-          text: 'Problem is being filed.' 
-        })
-        bot.replyWithDialog(message, dialog.asObject());
-      }
-    } 
-  }
-);
+controller.on('interactive_message_callback', function(bot, message) {
+  // check message.actions and message.callback_id to see what action to take...
+  console.log('A button was pressed ${message.callback_id}');
+  if (message.callback_id == bug_report_id) {
+    // Remove message if 'no' was chosen
+    if (message.actions[0].value == "nop") {
+      bot.replyInteractive(message, {
+        text: 'Must have resolved itself... or a refresh did the trick.' 
+      })
+    } else {
+      var dialog = create_bug_dialog();
+      bot.replyInteractive(message, {
+        text: 'Problem is being filed.' 
+      })
+      bot.replyWithDialog(message, dialog.asObject());
+    }
+  } 
+});
 
 
 controller.on('dialog_submission', function(bot, message) {
-	var submission = message.submission;
-	bot.reply(message, 'Thanks for you help, the problem was filed and our developer-penguins will be notified!');
-  console.log(submission);
+  var submission = message.submission;
+  bot.reply(message, 'Thanks for you help, the problem will be filed now!');
 
-	// call dialogOk or else Slack will think this is an error
-	bot.dialogOk();
+  // call dialogOk or else Slack will think this is an error
+  bot.dialogOk();
+
+  submit_bug_report(submission);
 });
+
+
+function submit_bug_report(submission) {
+  // Builds the markup'ed description
+  var description ='%0A%0A' + '%23%23 Environment' + '%0A%0A'+ encodeURI(submission.environment) + '%0A%0A' + '%23%23 Problem Description'+ '%0A%0A' + encodeURI(submission.problem)  + '%0A%0A' + '%23%23 Steps to reproduce' + '%0A%0A' + encodeURI(submission.reproduce);
+
+  var label = null;
+  switch (submission.severity) {
+    case 'bug':
+      label = 'Bug';
+      break;
+    case 'crit1':
+      label = 'Critical Bug \ud83d\udc27';
+      break;
+    case 'crit2':
+      label = 'Critical Bug \ud83d\udc27\ud83d\udc27';
+      break;
+    case 'crit3':
+      label = 'Critical Bug \ud83d\udc27\ud83d\udc27\ud83d\udc27';
+      break;
+  };
+
+  //var paramString = "title=" + encodeURI(submission.title) + "&description=" + encodeURI(description) + "&labels=" + encodeURI(label);
+  var paramString = "title=" + encodeURI(submission.title) + "&labels=" + encodeURI(label) + "&description=" + description;
+  var uri = 'https://gitlab.lana-labs.com/api/v4/projects/18/issues?' + paramString;
+  console.log(uri);
+
+	// construct an HTTP request
+	var xhr = new XMLHttpRequest();
+  xhr.open('POST', uri , true);
+	//xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+  xhr.setRequestHeader('PRIVATE-TOKEN', process.env.GITLAB_TOKEN);
+  xhr.setRequestHeader("Content-type", "application/json; charset=utf-8");
+
+	// send the collected data as JSON
+	xhr.send(null);
+
+  xhr.onreadystatechange = function() {
+    if(xhr.readyState == 4 && xhr.status < 400) {
+      console.log(JSON.parse(xhr.responseText).web_url);
+    }  
+  };
+  return;
+}
+
 
 function create_bug_dialog() {
   var dialog = bot.createDialog(
     'Bug Report',
     'submit_report',
     'Submit'
-  )
-    .addText('Title','title','', {placeholder: 'short description'})
+  ) .addText('Title','title','', {placeholder: 'short description'})
     .addSelect('Select severity', 'severity', null, [
         {label: 'Annoying', value: 'bug'},
         {label: 'Survivable but sweat-inducing', value: 'crit1'},
