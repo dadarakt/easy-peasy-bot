@@ -10,7 +10,7 @@ RUN npm install && npm cache clean --force
 COPY index.js /usr/src/app
 COPY bot.yml /usr/src/app
 
-COPY libs/* /usr/src/app/lib/
+COPY lib/* /usr/src/app/lib/
 
 #Secrets must be provided via command line args
 CMD CLIENT_ID=$CLIENT_ID \
